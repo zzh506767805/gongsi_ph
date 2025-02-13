@@ -25,7 +25,7 @@ const producthuntHeaders = {
 // 生成相关关键词
 async function generateKeywords(topic) {
   const completion = await openai.chat.completions.create({
-    model: "gpt-3.5-turbo",
+    model: "gpt-4o-mini",
     messages: [
       {
         role: "system",
@@ -72,7 +72,7 @@ async function searchProductHunt(keyword) {
 // 使用GPT整理数据
 async function analyzeProducts(products, topic) {
   const completion = await openai.chat.completions.create({
-    model: "gpt-3.5-turbo",
+    model: "gpt-4o-mini",
     messages: [
       {
         role: "system",
