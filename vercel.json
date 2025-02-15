@@ -19,9 +19,5 @@
       "src": "/(.*)",
       "dest": "frontend/phresearch/$1"
     }
-  ],
-  "env": {
-    "OPENAI_API_KEY": "@openai_api_key",
-    "PRODUCTHUNT_DEVELOPER_TOKEN": "@producthunt_developer_token"
-  }
+  ]
 }
