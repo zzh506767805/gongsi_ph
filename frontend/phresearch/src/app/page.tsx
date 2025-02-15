@@ -10,7 +10,16 @@ export default function Home() {
   const [result, setResult] = useState<{
     content: string;
     keywords: string[];
-    products: any[];
+    products: Array<{
+      name: string;
+      tagline: string;
+      description: string;
+      url: string;
+      votesCount: number;
+      website?: string;
+      createdAt: string;
+      topics: string[];
+    }>;
   } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
