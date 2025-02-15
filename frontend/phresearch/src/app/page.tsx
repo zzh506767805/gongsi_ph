@@ -86,7 +86,7 @@ export default function Home() {
               type="text"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              placeholder="输入要研究的产品主题，例如：CRM"
+              placeholder="输入要研究的产品主题，例如：一个智能获客系统，通过SEO和内容管理带来线索"
               className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-all duration-300 hover:border-blue-400"
               disabled={loading}
             />
