@@ -14,11 +14,9 @@ const openai = new OpenAI({
 // ProductHunt API配置
 const PRODUCTHUNT_API_URL = 'https://api.producthunt.com/v2/api/graphql';
 const producthuntHeaders = {
-  'Authorization': `Bearer ${process.env.PRODUCTHUNT_API_KEY}`,
+  'Authorization': `Bearer ${process.env.PRODUCTHUNT_DEVELOPER_TOKEN}`,
   'Content-Type': 'application/json',
-  'Accept': 'application/json',
-  'Client-Id': process.env.PRODUCTHUNT_API_KEY,
-  'Client-Secret': process.env.PRODUCTHUNT_CLIENT_SECRET
+  'Accept': 'application/json'
 };
 
 // 生成相关关键词
@@ -45,7 +43,7 @@ async function searchProductHunt(keyword) {
     console.log('发送ProductHunt API请求，关键词:', keyword);
     const query = `
       query($topic: String!) {
-        posts(first: 10, topic: $topic) {
+        posts(first: 10, topic: $topic, order: RANKING) {
           edges {
             node {
               id
