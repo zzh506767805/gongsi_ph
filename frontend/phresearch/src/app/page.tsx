@@ -245,18 +245,18 @@ export default function Home() {
                 .map((product, index) => (
                 <div
                   key={index}
-                  className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 flex flex-col min-h-[320px]"
+                  className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 flex flex-col"
                 >
-                  <div className="flex justify-between items-start mb-1.5">
-                    <h3 className="font-semibold text-lg text-gray-900 dark:text-white line-clamp-2 flex-1 pr-3">{product.name}</h3>
-                    <div className="flex items-center space-x-1 bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded-full shrink-0">
-                      <span className="text-blue-800 dark:text-blue-100 text-sm">▲</span>
-                      <span className="text-blue-800 dark:text-blue-100 font-medium text-sm">{product.votesCount}</span>
+                  <div className="flex-1 space-y-3">
+                    <div className="flex justify-between items-start mb-1.5">
+                      <h3 className="font-semibold text-lg text-gray-900 dark:text-white line-clamp-2 flex-1 pr-3">{product.name}</h3>
+                      <div className="flex items-center space-x-1 bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded-full shrink-0">
+                        <span className="text-blue-800 dark:text-blue-100 text-sm">▲</span>
+                        <span className="text-blue-800 dark:text-blue-100 font-medium text-sm">{product.votesCount}</span>
+                      </div>
                     </div>
-                  </div>
-                  <p className="text-gray-600 dark:text-gray-400 mb-1.5 line-clamp-3">{product.tagline}</p>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm mb-2 line-clamp-5">{product.description}</p>
-                  <div className="mt-auto space-y-3">
+                    <p className="text-gray-600 dark:text-gray-400 line-clamp-3">{product.tagline}</p>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm line-clamp-5">{product.description}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {product.topics?.map((topic, idx) => (
                         <span
@@ -274,7 +274,9 @@ export default function Home() {
                         </p>
                       </div>
                     )}
-                    <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700">
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <a
                           href={product.url}
