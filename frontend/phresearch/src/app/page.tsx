@@ -53,13 +53,25 @@ export default function Home() {
   }, []);
 
   // 保存历史记录
-  const saveToHistory = (topic: string, data: any, deepResearchData?: { [key: string]: string }) => {
+  const saveToHistory = (topic: string, data: {
+    keywords: string[];
+    products: Array<{
+      name: string;
+      tagline: string;
+      description: string;
+      url: string;
+      votesCount: number;
+      website?: string;
+      createdAt: string;
+      topics: string[];
+    }>;
+  }, deepResearchData?: { [key: string]: string }) => {
     const newHistory = {
       ...history,
       [topic]: {
         timestamp: Date.now(),
         keywords: data.keywords,
-        products: data.products.map((product: any) => ({
+        products: data.products.map((product) => ({
           ...product,
           deepResearch: deepResearchData?.[product.website || '']
         }))
@@ -77,8 +89,8 @@ export default function Home() {
         throw new Error('获取URL失败');
       }
       const data = await response.json();
-      return data.url;
-    } catch (error: any) {
+      return data.url as string;
+    } catch (error) {
       console.error('获取实际URL失败:', error);
       return null;
     }
@@ -126,11 +138,11 @@ export default function Home() {
         throw new Error('研究请求失败');
       }
 
-      const data = await response.json();
+      const researchData = await response.json();
       setLoadingProgress(100);
       setLoadingMessage('研究完成！');
-      setResult(data);
-      saveToHistory(topic, data);
+      setResult(researchData);
+      saveToHistory(topic, researchData);
     } catch (error) {
       console.error('Error:', error);
       alert('研究过程中出现错误，请重试');
@@ -157,7 +169,8 @@ export default function Home() {
             <div className="flex flex-wrap gap-2">
               {Object.entries(history)
                 .sort(([, a], [, b]) => b.timestamp - a.timestamp)
-                .map(([historyTopic, data]) => (
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                .map(([historyTopic, _]) => (
                   <button
                     key={historyTopic}
                     onClick={() => {
@@ -300,15 +313,15 @@ export default function Home() {
                               const data = await response.json();
                               setDeepResearch(prev => ({ ...prev, [product.website || '']: data.output }));
                               // 更新历史记录中的深度研究数据
-                              if (topic) {
+                              if (topic && result) {
                                 saveToHistory(topic, result, {
                                   ...deepResearch,
                                   [product.website || '']: data.output
                                 });
                               }
-                            } catch (error: any) {
+                            } catch (error) {
                               console.error('深度研究请求失败:', error);
-                              alert('深度研究失败: ' + (error.message || '未知错误'));
+                              alert('深度研究失败: ' + (error instanceof Error ? error.message : '未知错误'));
                             } finally {
                               setResearchLoading(prev => ({ ...prev, [product.website || '']: false }));
                             }
