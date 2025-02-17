@@ -44,11 +44,35 @@ export default function Home() {
     }>;
   } | null>(null);
 
+  // 从历史记录中提取所有深度研究结果
+  const getAllDeepResearch = () => {
+    const allDeepResearch: { [key: string]: string } = {};
+    Object.values(history).forEach(record => {
+      record.products.forEach(product => {
+        if (product.website && product.deepResearch) {
+          allDeepResearch[product.website] = product.deepResearch;
+        }
+      });
+    });
+    return allDeepResearch;
+  };
+
   // 加载历史记录
   useEffect(() => {
     const savedHistory = localStorage.getItem('researchHistory');
     if (savedHistory) {
-      setHistory(JSON.parse(savedHistory));
+      const parsedHistory = JSON.parse(savedHistory) as ResearchHistory;
+      setHistory(parsedHistory);
+      // 初始化时加载所有深度研究结果
+      const allDeepResearch = Object.values(parsedHistory).reduce<{ [key: string]: string }>((acc, record) => {
+        record.products.forEach((product) => {
+          if (product.website && product.deepResearch) {
+            acc[product.website] = product.deepResearch;
+          }
+        });
+        return acc;
+      }, {});
+      setDeepResearch(allDeepResearch);
     }
   }, []);
 
@@ -111,14 +135,8 @@ export default function Home() {
           deepResearch: undefined
         }))
       });
-      // 恢复深度研究结果
-      const deepResearchData: { [key: string]: string } = {};
-      historicalData.products.forEach(p => {
-        if (p.deepResearch && p.website) {
-          deepResearchData[p.website] = p.deepResearch;
-        }
-      });
-      setDeepResearch(deepResearchData);
+      // 加载所有深度研究结果
+      setDeepResearch(getAllDeepResearch());
       return;
     }
 
@@ -131,7 +149,10 @@ export default function Home() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ topic }),
+        body: JSON.stringify({ 
+          topic,
+          existingResearch: getAllDeepResearch() // 使用所有历史深度研究结果
+        }),
       });
 
       if (!response.ok) {
@@ -142,13 +163,61 @@ export default function Home() {
       setLoadingProgress(100);
       setLoadingMessage('研究完成！');
       setResult(researchData);
-      saveToHistory(topic, researchData);
+
+      // 如果有深度研究结果，也要设置到 deepResearch 状态中
+      const deepResearchData: { [key: string]: string } = {};
+      researchData.products.forEach((product: {
+        website?: string;
+        deepResearch?: string;
+      }) => {
+        if (product.website && product.deepResearch) {
+          deepResearchData[product.website] = product.deepResearch;
+        }
+      });
+      setDeepResearch(prev => ({
+        ...prev,
+        ...deepResearchData
+      }));
+
+      // 保存到历史记录，但不包含深度研究结果
+      const productsWithoutDeepResearch = researchData.products.map((p: {
+        name: string;
+        tagline: string;
+        description: string;
+        url: string;
+        votesCount: number;
+        website?: string;
+        createdAt: string;
+        topics: string[];
+        deepResearch?: string;
+      }) => ({
+        ...p,
+        deepResearch: undefined
+      }));
+      saveToHistory(topic, {
+        ...researchData,
+        products: productsWithoutDeepResearch
+      });
     } catch (error) {
       console.error('Error:', error);
       alert('研究过程中出现错误，请重试');
     } finally {
       setLoading(false);
     }
+  };
+
+  // 修改历史记录按钮的点击处理函数
+  const handleHistoryClick = (historyTopic: string) => {
+    setTopic(historyTopic);
+    const historicalData = history[historyTopic];
+    setResult({
+      content: '',
+      keywords: historicalData.keywords,
+      products: historicalData.products.map(p => ({
+        ...p,
+        deepResearch: undefined
+      }))
+    });
   };
 
   return (
@@ -173,27 +242,7 @@ export default function Home() {
                 .map(([historyTopic, _]) => (
                   <button
                     key={historyTopic}
-                    onClick={() => {
-                      setTopic(historyTopic);
-                      // 直接设置结果
-                      const historicalData = history[historyTopic];
-                      setResult({
-                        content: '',
-                        keywords: historicalData.keywords,
-                        products: historicalData.products.map(p => ({
-                          ...p,
-                          deepResearch: undefined
-                        }))
-                      });
-                      // 恢复深度研究结果
-                      const deepResearchData: { [key: string]: string } = {};
-                      historicalData.products.forEach(p => {
-                        if (p.deepResearch && p.website) {
-                          deepResearchData[p.website] = p.deepResearch;
-                        }
-                      });
-                      setDeepResearch(deepResearchData);
-                    }}
+                    onClick={() => handleHistoryClick(historyTopic)}
                     className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                   >
                     {historyTopic}

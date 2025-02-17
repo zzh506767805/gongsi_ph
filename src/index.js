@@ -92,24 +92,6 @@ async function searchProductHunt(keyword) {
   }
 }
 
-// 使用GPT整理数据
-async function analyzeProducts(products, topic) {
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      {
-        role: "system",
-        content: "你是一位资深的产品战略分析师，请对ProductHunt上的产品数据进行深度分析并生成专业的市场研究报告。请遵循以下分析框架：\n\n1. 市场格局分析\n- 产品类型分布：对现有产品进行分类，识别主流解决方案和创新方向\n- 技术栈分析：评估主要产品采用的技术方案和架构特点\n- 商业模式：分析主流的盈利模式和定价策略\n\n2. 用户需求洞察\n- 核心痛点：通过产品功能和用户反馈，提炼出关键的用户痛点\n- 使用场景：归纳主要的应用场景和用户群体\n\n3. 创新机会\n- 市场空白：发现未被满足的用户需求\n- 差异化方向：提出潜在的创新突破口\n\n请用中文输出分析报告。"
-      },
-      {
-        role: "user",
-        content: `请分析以下与"${topic}"相关的产品数据，生成市场研究报告：\n\n${JSON.stringify(products, null, 2)}`
-      }
-    ]
-  });
-  return completion.choices[0].message.content;
-}
-
 // 主函数
 async function main(topic) {
   console.log('开始研究主题:', topic);
@@ -129,11 +111,8 @@ async function main(topic) {
   const uniqueProducts = Array.from(new Map(allProducts.map(item => [item.name, item])).values());
   console.log('找到', uniqueProducts.length, '个相关产品');
   
-  // 3. 分析产品数据
-  const analysisContent = await analyzeProducts(uniqueProducts, topic);
-  
   return {
-    content: analysisContent,
+    content: '', // 不再生成市场研究报告
     keywords: keywords,
     products: uniqueProducts
   };
@@ -145,8 +124,21 @@ app.use(express.json());
 // 主研究路由
 app.post('/api/research', async (req, res) => {
   try {
-    const { topic } = req.body;
+    const { topic, existingResearch } = req.body;
+    if (!topic) {
+      return res.status(400).json({ message: '请提供产品主题' });
+    }
+
     const result = await main(topic);
+
+    // 如果提供了已有的深度研究结果，添加到新的搜索结果中
+    if (existingResearch) {
+      result.products = result.products.map(product => ({
+        ...product,
+        deepResearch: product.website ? existingResearch[product.website] : undefined
+      }));
+    }
+
     res.json(result);
   } catch (error) {
     console.error('API错误:', error);
