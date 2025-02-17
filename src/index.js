@@ -66,30 +66,26 @@ async function searchProductHunt(keyword) {
         }
       }
     `;
+
     const response = await axios.post(
       PRODUCTHUNT_API_URL,
-      {
-        query,
-        variables: { topic: keyword }
-      },
+      { query, variables: { topic: keyword } },
       { headers: producthuntHeaders }
     );
 
-    if (!response.data?.data?.posts?.edges) {
-      console.error('ProductHunt API响应格式错误:', JSON.stringify(response.data, null, 2));
-      return [];
+    if (response.data.data && response.data.data.posts) {
+      return response.data.data.posts.edges.map(edge => ({
+        name: edge.node.name,
+        tagline: edge.node.tagline,
+        description: edge.node.description,
+        url: edge.node.url,
+        votesCount: edge.node.votesCount,
+        website: edge.node.website,
+        createdAt: edge.node.createdAt,
+        topics: edge.node.topics.edges.map(topicEdge => topicEdge.node.name)
+      }));
     }
-
-    return response.data.data.posts.edges.map(({ node: post }) => ({
-      name: post.name,
-      tagline: post.tagline,
-      description: post.description,
-      url: post.url,
-      votesCount: post.votesCount,
-      website: post.website,
-      createdAt: post.createdAt,
-      topics: post.topics?.edges?.map(edge => edge.node.name) || []
-    }));
+    return [];
   } catch (error) {
     console.error('ProductHunt API请求失败:', error.response?.data || error.message);
     return [];
@@ -103,11 +99,11 @@ async function analyzeProducts(products, topic) {
     messages: [
       {
         role: "system",
-        content: "你是一位资深的产品战略分析师，请对ProductHunt上的产品数据进行深度分析并生成专业的市场研究报告。请遵循以下分析框架：\n\n1. 市场格局分析\n- 产品类型分布：对现有产品进行分类，识别主流解决方案和创新方向\n- 技术栈分析：评估主要产品采用的技术方案和架构特点\n- 商业模式：分析主流的盈利模式和定价策略\n\n2. 用户需求洞察\n- 核心痛点：通过产品功能和用户反馈，提炼出关键的用户痛点\n- 使用场景：归纳主要的应用场景和用户行为模式\n- 需求缺口：发现现有产品未能很好满足的用户需求\n\n3. 竞争优势分析\n- 差异化空间：分析现有产品的重叠度，寻找差异化机会\n- 创新机会：基于技术发展和市场趋势，预测潜在的创新方向\n- 进入壁垒：评估市场准入门槛和竞争壁垒\n\n4. 发展建议\n- 产品定位：如何在现有市场中找到独特定位\n- 功能规划：建议优先开发的核心功能和特性\n- 商业策略：如何构建可持续的竞争优势\n\n请基于数据生成专业、客观的分析报告，使用清晰的标题层级，并尽可能提供具体的数据支持和实例说明。"
+        content: "你是一位资深的产品战略分析师，请对ProductHunt上的产品数据进行深度分析并生成专业的市场研究报告。请遵循以下分析框架：\n\n1. 市场格局分析\n- 产品类型分布：对现有产品进行分类，识别主流解决方案和创新方向\n- 技术栈分析：评估主要产品采用的技术方案和架构特点\n- 商业模式：分析主流的盈利模式和定价策略\n\n2. 用户需求洞察\n- 核心痛点：通过产品功能和用户反馈，提炼出关键的用户痛点\n- 使用场景：归纳主要的应用场景和用户群体\n\n3. 创新机会\n- 市场空白：发现未被满足的用户需求\n- 差异化方向：提出潜在的创新突破口\n\n请用中文输出分析报告。"
       },
       {
         role: "user",
-        content: `请分析以下与"${topic}"相关的产品数据，按照上述两个部分的结构生成报告。\n产品数据：\n${JSON.stringify(products, null, 2)}`
+        content: `请分析以下与"${topic}"相关的产品数据，生成市场研究报告：\n\n${JSON.stringify(products, null, 2)}`
       }
     ]
   });
@@ -116,52 +112,31 @@ async function analyzeProducts(products, topic) {
 
 // 主函数
 async function main(topic) {
-  try {
-    console.log(`开始研究主题: ${topic}`);
-    
-    // 1. 生成关键词
-    const keywords = await generateKeywords(topic);
-    if (!keywords || !Array.isArray(keywords) || keywords.length === 0) {
-      throw new Error('关键词生成失败或结果为空');
-    }
-    console.log('生成的关键词:', keywords);
-
-    // 2. 搜索ProductHunt
-    let allProducts = [];
-    for (const keyword of keywords) {
-      const products = await searchProductHunt(keyword);
-      if (!products || !Array.isArray(products)) {
-        throw new Error(`搜索关键词"${keyword}"时发生错误`);
-      }
-      allProducts = allProducts.concat(products);
-    }
-
-    // 去重
-    allProducts = Array.from(new Set(allProducts.map(p => JSON.stringify(p)))).map(p => JSON.parse(p));
-    if (allProducts.length === 0) {
-      throw new Error('未找到任何相关产品');
-    }
-    console.log(`找到 ${allProducts.length} 个相关产品`);
-
-    // 3. 使用GPT分析数据
-    const analysis = await analyzeProducts(allProducts, topic);
-    if (!analysis) {
-      throw new Error('产品分析失败');
-    }
-
-    return {
-      content: analysis,
-      keywords: keywords,
-      products: allProducts
-    };
-
-  } catch (error) {
-    console.error('执行过程中出现错误:', {
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
+  console.log('开始研究主题:', topic);
+  
+  // 1. 生成关键词
+  const keywords = await generateKeywords(topic);
+  console.log('生成的关键词:', keywords);
+  
+  // 2. 搜索ProductHunt
+  let allProducts = [];
+  for (const keyword of keywords) {
+    const products = await searchProductHunt(keyword);
+    allProducts = allProducts.concat(products);
   }
+  
+  // 去重
+  const uniqueProducts = Array.from(new Map(allProducts.map(item => [item.name, item])).values());
+  console.log('找到', uniqueProducts.length, '个相关产品');
+  
+  // 3. 分析产品数据
+  const analysisContent = await analyzeProducts(uniqueProducts, topic);
+  
+  return {
+    content: analysisContent,
+    keywords: keywords,
+    products: uniqueProducts
+  };
 }
 
 app.use(cors());
