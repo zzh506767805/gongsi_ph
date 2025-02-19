@@ -261,8 +261,11 @@ export default function Home() {
       if (newFavorites[key]) {
         delete newFavorites[key];
       } else {
+        // 收藏时，同时保存深度研究结果
+        const websiteKey = product.website || '';
         newFavorites[key] = {
           ...product,
+          deepResearch: deepResearch[websiteKey] || product.deepResearch,
           addedAt: Date.now()
         };
       }
