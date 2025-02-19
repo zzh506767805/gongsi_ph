@@ -38,12 +38,12 @@ async function generateKeywords(topic) {
 }
 
 // 从ProductHunt获取数据
-async function searchProductHunt(keyword) {
+async function searchProductHunt(keyword, count = 10) {
   try {
-    console.log('发送ProductHunt API请求，关键词:', keyword);
+    console.log('发送ProductHunt API请求，关键词:', keyword, '数量:', count);
     const query = `
-      query($topic: String!) {
-        posts(first: 10, topic: $topic, order: RANKING) {
+      query($topic: String!, $first: Int!) {
+        posts(first: $first, featured: true, topic: $topic) {
           edges {
             node {
               id
@@ -69,12 +69,25 @@ async function searchProductHunt(keyword) {
 
     const response = await axios.post(
       PRODUCTHUNT_API_URL,
-      { query, variables: { topic: keyword } },
+      { 
+        query, 
+        variables: { 
+          topic: keyword,
+          first: count
+        } 
+      },
       { headers: producthuntHeaders }
     );
 
+    console.log('API响应:', JSON.stringify(response.data, null, 2));
+
+    if (response.data.errors) {
+      console.error('GraphQL错误:', response.data.errors);
+      return [];
+    }
+
     if (response.data.data && response.data.data.posts) {
-      return response.data.data.posts.edges.map(edge => ({
+      const products = response.data.data.posts.edges.map(edge => ({
         name: edge.node.name,
         tagline: edge.node.tagline,
         description: edge.node.description,
@@ -84,26 +97,47 @@ async function searchProductHunt(keyword) {
         createdAt: edge.node.createdAt,
         topics: edge.node.topics.edges.map(topicEdge => topicEdge.node.name)
       }));
+      console.log(`关键词 "${keyword}" 找到 ${products.length} 个产品`);
+      return products;
     }
+    console.log(`关键词 "${keyword}" 没有找到产品`);
     return [];
   } catch (error) {
-    console.error('ProductHunt API请求失败:', error.response?.data || error.message);
+    if (error.response) {
+      console.error('ProductHunt API响应错误:', {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data
+      });
+    } else {
+      console.error('ProductHunt API请求失败:', error.message);
+    }
     return [];
   }
 }
 
 // 主函数
-async function main(topic) {
+async function main(topic, keywordWeights = null, skipKeywordGeneration = false) {
   console.log('开始研究主题:', topic);
+  console.log('skipKeywordGeneration:', skipKeywordGeneration);
+  console.log('keywordWeights:', keywordWeights);
   
-  // 1. 生成关键词
-  const keywords = await generateKeywords(topic);
-  console.log('生成的关键词:', keywords);
+  let keywords = [];
+  if (skipKeywordGeneration && keywordWeights) {
+    // 如果跳过关键词生成且提供了关键词权重，直接使用权重中的关键词
+    keywords = Object.keys(keywordWeights);
+    console.log('使用用户调整后的关键词:', keywords);
+  } else if (!skipKeywordGeneration) {
+    // 只有在不跳过关键词生成时，才生成新的关键词
+    keywords = await generateKeywords(topic);
+    console.log('生成新的关键词:', keywords);
+  }
   
-  // 2. 搜索ProductHunt
+  // 搜索ProductHunt
   let allProducts = [];
   for (const keyword of keywords) {
-    const products = await searchProductHunt(keyword);
+    const count = keywordWeights ? keywordWeights[keyword] : 10;
+    const products = await searchProductHunt(keyword, count);
     allProducts = allProducts.concat(products);
   }
   
@@ -112,7 +146,7 @@ async function main(topic) {
   console.log('找到', uniqueProducts.length, '个相关产品');
   
   return {
-    content: '', // 不再生成市场研究报告
+    content: '',
     keywords: keywords,
     products: uniqueProducts
   };
@@ -124,12 +158,12 @@ app.use(express.json());
 // 主研究路由
 app.post('/api/research', async (req, res) => {
   try {
-    const { topic, existingResearch } = req.body;
+    const { topic, existingResearch, keywordWeights, skipKeywordGeneration } = req.body;
     if (!topic) {
       return res.status(400).json({ message: '请提供产品主题' });
     }
 
-    const result = await main(topic);
+    const result = await main(topic, keywordWeights, skipKeywordGeneration);
 
     // 如果提供了已有的深度研究结果，添加到新的搜索结果中
     if (existingResearch) {

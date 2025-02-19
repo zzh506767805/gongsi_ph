@@ -35,6 +35,12 @@ type Favorite = {
   addedAt: number;
 };
 
+// 关键词权重类型定义
+type KeywordWeight = {
+  keyword: string;
+  count: number;
+};
+
 export default function Home() {
   const [topic, setTopic] = useState('');
   const [loading, setLoading] = useState(false);
@@ -59,6 +65,9 @@ export default function Home() {
       topics: string[];
     }>;
   } | null>(null);
+  const [showKeywordModal, setShowKeywordModal] = useState(false);
+  const [keywordWeights, setKeywordWeights] = useState<KeywordWeight[]>([]);
+  const [isAdjusting, setIsAdjusting] = useState(false);
 
   // 从历史记录中提取所有深度研究结果
   const getAllDeepResearch = () => {
@@ -173,7 +182,7 @@ export default function Home() {
         },
         body: JSON.stringify({ 
           topic,
-          existingResearch: getAllDeepResearch() // 使用所有历史深度研究结果
+          existingResearch: getAllDeepResearch(),
         }),
       });
 
@@ -282,6 +291,82 @@ export default function Home() {
     return !!favorites[key];
   };
 
+  // 使用调整后的关键词重新研究
+  const handleReresearch = async () => {
+    if (!topic) return;
+    setIsAdjusting(true);
+    try {
+      // 过滤掉空关键词
+      const validKeywords = keywordWeights.filter(kw => kw.keyword.trim() !== '');
+      if (validKeywords.length === 0) {
+        alert('请至少保留一个有效的关键词');
+        return;
+      }
+
+      const response = await fetch('http://localhost:3002/api/research', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          topic,
+          existingResearch: getAllDeepResearch(),
+          skipKeywordGeneration: true,
+          keywordWeights: validKeywords.reduce((acc, kw) => {
+            if (kw.keyword.trim()) {
+              acc[kw.keyword.trim()] = kw.count;
+            }
+            return acc;
+          }, {} as { [key: string]: number })
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('研究请求失败');
+      }
+
+      const researchData = await response.json();
+      researchData.keywords = validKeywords.map(kw => kw.keyword.trim());
+      setResult(researchData);
+      setShowKeywordModal(false);
+    } catch (error) {
+      console.error('Error:', error);
+      alert('研究过程中出现错误，请重试');
+    } finally {
+      setIsAdjusting(false);
+    }
+  };
+
+  // 更新关键词权重
+  const updateKeywordWeight = (index: number, count: number) => {
+    setKeywordWeights(prev => {
+      const newWeights = [...prev];
+      newWeights[index] = { ...newWeights[index], count };
+      return newWeights;
+    });
+  };
+
+  // 删除关键词
+  const removeKeyword = (index: number) => {
+    setKeywordWeights(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // 添加新关键词
+  const addKeyword = () => {
+    setKeywordWeights(prev => [...prev, { keyword: '', count: 10 }]);
+  };
+
+  // 当结果更新时，初始化关键词权重
+  useEffect(() => {
+    if (result && (!keywordWeights.length || !keywordWeights.every(kw => result.keywords.includes(kw.keyword)))) {
+      // 只在首次获取结果或关键词列表发生变化时初始化权重
+      setKeywordWeights(result.keywords.map(keyword => ({
+        keyword,
+        count: 10 // 默认每个关键词搜索10个结果
+      })));
+    }
+  }, [result?.keywords]);
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto space-y-8">
@@ -315,7 +400,7 @@ export default function Home() {
           >
             我的收藏
           </button>
-        </div>
+          </div>
 
         {/* 历史记录展示 */}
         {!showFavorites && Object.keys(history).length > 0 && (
@@ -334,49 +419,76 @@ export default function Home() {
                     {historyTopic}
                   </button>
                 ))}
-            </div>
+          </div>
           </div>
         )}
         
         {!showFavorites && (
-          <form onSubmit={handleSubmit} className="space-y-6 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6 relative overflow-hidden group hover:shadow-xl transition-shadow duration-300">
-            <div className="flex flex-col space-y-4">
-              <input
-                type="text"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                placeholder="输入要研究的产品主题，例如：一个智能获客系统，通过SEO和内容管理带来线索"
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-all duration-300 hover:border-blue-400"
-                disabled={loading}
-              />
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]"
-              >
-                {loading ? '研究中...' : '开始研究'}
-              </button>
-            </div>
-            {loading && (
-              <div className="mt-4 space-y-4">
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
-                  <div
-                    className="bg-blue-600 h-full rounded-full transition-all duration-300 ease-out"
-                    style={{ width: `${loadingProgress}%` }}
-                  />
-                </div>
-                <div className="text-center space-y-2">
-                  <p className="text-gray-600 dark:text-gray-400">{loadingMessage}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">预计需要1分钟左右，您可以先休息一下 ☕️</p>
-                </div>
+        <form onSubmit={handleSubmit} className="space-y-6 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6 relative overflow-hidden group hover:shadow-xl transition-shadow duration-300">
+          <div className="flex flex-col space-y-4">
+            <input
+              type="text"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              placeholder="输入要研究的产品主题，例如：一个智能获客系统，通过SEO和内容管理带来线索"
+              className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white transition-all duration-300 hover:border-blue-400"
+              disabled={loading}
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]"
+            >
+              {loading ? '研究中...' : '开始研究'}
+            </button>
+          </div>
+          {loading && (
+            <div className="mt-4 space-y-4">
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-blue-600 h-full rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${loadingProgress}%` }}
+                />
               </div>
-            )}
-          </form>
+              <div className="text-center space-y-2">
+                <p className="text-gray-600 dark:text-gray-400">{loadingMessage}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">预计需要1分钟左右，您可以先休息一下 ☕️</p>
+              </div>
+            </div>
+          )}
+        </form>
         )}
 
         {/* 研究结果展示 */}
         {!showFavorites && result && (
           <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6 space-y-8">
+            {/* 关键词部分 */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
+                  <span>关键词</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">#{result.keywords.length}</span>
+                </h2>
+                <button
+                  onClick={() => setShowKeywordModal(true)}
+                  className="px-4 py-2 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
+                >
+                  调整关键词权重
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {result.keywords.map((keyword, index) => (
+                  <span
+                    key={index}
+                    className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 rounded-full text-sm hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors cursor-default"
+                  >
+                    {keyword}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* 产品卡片网格 */}
             <div className="grid gap-6 md:grid-cols-3">
               {result.products
                 .sort((a, b) => b.votesCount - a.votesCount)
@@ -386,12 +498,12 @@ export default function Home() {
                   className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 flex flex-col"
                 >
                   <div className="flex-1 space-y-3">
-                    <div className="flex justify-between items-start mb-1.5">
-                      <h3 className="font-semibold text-lg text-gray-900 dark:text-white line-clamp-2 flex-1 pr-3">{product.name}</h3>
+                  <div className="flex justify-between items-start mb-1.5">
+                    <h3 className="font-semibold text-lg text-gray-900 dark:text-white line-clamp-2 flex-1 pr-3">{product.name}</h3>
                       <div className="flex items-center gap-2">
-                        <div className="flex items-center space-x-1 bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded-full shrink-0">
-                          <span className="text-blue-800 dark:text-blue-100 text-sm">▲</span>
-                          <span className="text-blue-800 dark:text-blue-100 font-medium text-sm">{product.votesCount}</span>
+                    <div className="flex items-center space-x-1 bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded-full shrink-0">
+                      <span className="text-blue-800 dark:text-blue-100 text-sm">▲</span>
+                      <span className="text-blue-800 dark:text-blue-100 font-medium text-sm">{product.votesCount}</span>
                         </div>
                         <button
                           onClick={(e) => {
@@ -407,8 +519,8 @@ export default function Home() {
                         >
                           {isFavorited(product) ? '★' : '☆'}
                         </button>
-                      </div>
                     </div>
+                  </div>
                     <p className="text-gray-600 dark:text-gray-400 line-clamp-3">{product.tagline}</p>
                     <p className="text-gray-500 dark:text-gray-400 text-sm line-clamp-5">{product.description}</p>
                     <div className="flex flex-wrap gap-1.5">
@@ -432,15 +544,15 @@ export default function Home() {
                   <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <a
-                          href={product.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 dark:text-blue-400 hover:underline text-sm inline-flex items-center group"
-                        >
-                          <span>在 ProductHunt 查看</span>
-                          <span className="transform transition-transform group-hover:translate-x-1 ml-1">→</span>
-                        </a>
+                      <a
+                        href={product.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 dark:text-blue-400 hover:underline text-sm inline-flex items-center group"
+                      >
+                        <span>在 ProductHunt 查看</span>
+                        <span className="transform transition-transform group-hover:translate-x-1 ml-1">→</span>
+                      </a>
                         <button
                           onClick={async () => {
                             if (researchLoading[product.website || ''] || !product.website) return;
@@ -509,21 +621,78 @@ export default function Home() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
 
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
-                <span>关键词</span>
-                <span className="text-sm text-gray-500 dark:text-gray-400">#{result.keywords.length}</span>
-              </h2>
-              <div className="flex flex-wrap gap-2">
-                {result.keywords.map((keyword, index) => (
-                  <span
-                    key={index}
-                    className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 rounded-full text-sm hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors cursor-default"
+        {/* 关键词权重调整弹窗 */}
+        {showKeywordModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">调整关键词权重</h3>
+                  <button
+                    onClick={() => setShowKeywordModal(false)}
+                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                   >
-                    {keyword}
-                  </span>
-                ))}
+                    ✕
+                  </button>
+                </div>
+                
+                <div className="space-y-4">
+                  {keywordWeights.map((kw, index) => (
+                    <div key={index} className="flex items-center gap-4">
+                      <input
+                        type="text"
+                        value={kw.keyword}
+                        onChange={(e) => {
+                          const newWeights = [...keywordWeights];
+                          newWeights[index].keyword = e.target.value;
+                          setKeywordWeights(newWeights);
+                        }}
+                        className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                        placeholder="输入关键词"
+                      />
+                      <input
+                        type="number"
+                        value={kw.count}
+                        onChange={(e) => updateKeywordWeight(index, Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-20 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                        min="1"
+                      />
+                      <button
+                        onClick={() => removeKeyword(index)}
+                        className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <button
+                    onClick={addKeyword}
+                    className="px-4 py-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                  >
+                    + 添加关键词
+                  </button>
+                  <div className="space-x-4">
+                    <button
+                      onClick={() => setShowKeywordModal(false)}
+                      className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                    >
+                      取消
+                    </button>
+                    <button
+                      onClick={handleReresearch}
+                      disabled={isAdjusting}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isAdjusting ? '研究中...' : '重新研究'}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

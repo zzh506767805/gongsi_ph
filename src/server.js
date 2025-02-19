@@ -88,22 +88,35 @@ app.post('/api/deep-research', async (req, res) => {
 
 app.post('/api/research', async (req, res) => {
   try {
-    const { topic } = req.body;
+    const { topic, existingResearch, keywordWeights, skipKeywordGeneration } = req.body;
     if (!topic) {
       return res.status(400).json({ message: '请提供产品主题' });
     }
 
-    const result = await main(topic);
-    
-    // 确保返回前端需要的数据结构
-    res.json({
-      content: result.content || '',
-      keywords: result.keywords || [],
-      products: result.products || []
+    console.log('接收到的请求参数:', {
+      topic,
+      skipKeywordGeneration,
+      keywordWeights
     });
+
+    const result = await main(
+      topic,
+      keywordWeights || null,
+      skipKeywordGeneration || false
+    );
+    
+    // 如果提供了已有的深度研究结果，添加到新的搜索结果中
+    if (existingResearch) {
+      result.products = result.products.map(product => ({
+        ...product,
+        deepResearch: product.website ? existingResearch[product.website] : undefined
+      }));
+    }
+
+    res.json(result);
   } catch (error) {
     console.error('API错误:', error);
-    res.status(500).json({ message: error.message || '服务器内部错误' });
+    res.status(500).json({ message: error.message });
   }
 });
 
