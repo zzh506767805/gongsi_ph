@@ -16,7 +16,8 @@ const PRODUCTHUNT_API_URL = 'https://api.producthunt.com/v2/api/graphql';
 const producthuntHeaders = {
   'Authorization': `Bearer ${process.env.PRODUCTHUNT_DEVELOPER_TOKEN}`,
   'Content-Type': 'application/json',
-  'Accept': 'application/json'
+  'Accept': 'application/json',
+  'User-Agent': 'curl/7.64.1'
 };
 
 // 生成相关关键词
