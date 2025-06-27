@@ -2,9 +2,9 @@
   "name": "product_research_ai",
   "version": "1.0.0",
   "description": "AI-powered product research assistant that fetches data from ProductHunt and processes it using GPT",
-  "main": "src/index.js",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node src/index.js",
+    "start": "node src/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
